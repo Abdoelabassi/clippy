@@ -32,21 +32,21 @@ fn load_last_n_entries(n: usize) -> Vec<String>{
     }
 }
 
+#[tauri::command]
 fn init(on_event: Channel<String>){
     spawn(move || {
         let mut clipboard = Clipboard::new()::unwrap();
-        let mut last_text = String::new();
         loop {
             if let Ok(text) = clipboard.get_text() {
-                if text != last_text {
-                    last_text = text.clone();
-                    on_event.send(text).unwrap();
-                    let mut history = load_history().unwrap_or(ClipboardHistory { items: vec![] });
-                    history.items.push(text);
-                    save_history(&history).unwrap();
-                }
+                    let mut history = load_history().unwrap_else(|_| ClipboardHistory{ items: vec![] });
+                    if history.items.last().map(|last| last != &text).unwrap_or(true){
+                        history.items.push(text.clone());
+                        save_history(&history).unwrap();
+                        on_event.send(text).unwrap();
+                    }
+                
             }
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            std::thread::sleep(std::time::Duration::from_millis(2000)); // equivalent to 2 seconds
         }
     })
 }

@@ -1,51 +1,107 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
+import React, { useState, useEffect } from "react";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import "./App.css";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+const App: React.FC = () => {
+  const [clippboardItems, setClipboardItems] = useState<string[]>([]);
+  const [filter, setFilter] = useState<number>(5);
+  const [status, setStatus] = useState<string>("");
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+  const fetchClipboardHistory = async (n: number) => {
+    try {
+      const items: string[] = await invoke("load_last_n_entries", { n });
+      setClipboardItems(items);
+      setStatus(items.length > 0 ? "" : "No clipboard history found");
+    } catch (error) {
+      console.error("Error fetching clipboard history: ", error);
+      setStatus("Error fetching clipboard history");
+    }
+  };
+
+  const copyItemsToClipboard = async (data: string) => {
+    try {
+      await invoke("copy", { data });
+    } catch (error) {
+      console.error("Error copying to clipboard: ", error);
+      setStatus("Error copying to clipboard");
+    }
+  };
+
+  const wipeAllClipboardHistory = async () => {
+    try {
+      await invoke("wipe_all");
+      setClipboardItems([]);
+      setStatus("All clipboard history wiped");
+    } catch (error) {
+      console.error("Error wiping clipboard history: ", error);
+      setStatus("Error wiping clipboard history");
+    }
+  };
+
+  useEffect(() => {
+    const initializeClipboard = async () => {
+      try {
+        const onEvent = new Channel<string>();
+        onEvent.onmessage = (message: string) => {
+          console.log("Clipboard updated");
+          setClipboardItems((prevItems) => [message, ...prevItems]);
+        };
+        await invoke("init", { onEvent });
+      } catch (error) {
+        console.error("Error initializing clipboard: ", error);
+        setStatus("Error initializing clipboard");
+      }
+    };
+    initializeClipboard();
+    fetchClipboardHistory(filter);
+
+    return () => {
+      console.log("Cleaning up on unmount");
+    };
+  }, [filter]);
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vitejs.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://reactjs.org" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+    <div className="app">
+      <header className="app-header">
+        <h1>Clippy</h1>
+        <p>Manage your clipboard history easy!!</p>
+      </header>
+      <main className="app-main">
+        <div className="controls">
+          <div className="filter-container">
+            <label htmlFor="filter">Show last: </label>
+            <select
+              id="filter"
+              value={filter}
+              onChange={(e) => setFilter(Number.parseInt(e.target.value))}
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
+          <button onClick={wipeAllClipboardHistory} className="wipe-button">
+            Wipe all
+          </button>
+        </div>
+        {status && <p className="status">{status}</p>}
+        <ul className="clipboard-list">
+          {clippboardItems.map((item, idx) => (
+            <li className="clipboard-item" key={idx}>
+              <span className="item-text">{item}</span>
+              <button
+                onClick={() => copyItemsToClipboard(item)}
+                className="copy-button"
+              >
+                Copy
+              </button>
+            </li>
+          ))}
+        </ul>
+      </main>
+    </div>
   );
-}
+};
 
 export default App;

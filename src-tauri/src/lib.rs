@@ -1,10 +1,9 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use std::fs::{remove_file, File, OpenOptions};
 use std::io::{BufReader, BufWriter};
-use std::path::PathBuf;
 use arboard::Clipboard;
 use tauri::ipc::Channel;
-use serde::{Serialize, Deserialize}
+use serde::{Serialize, Deserialize};
 
 
 
@@ -12,7 +11,7 @@ use serde::{Serialize, Deserialize}
 struct ClipboardHistory {
     items: Vec<String>,
 }
-const PATH: &str = "/Users/mac/Desktop/clipboard-manager/clippy/clipboad_history.json"
+const PATH: &str = "/Users/mac/Desktop/clipboard-manager/clippy/clipboad_history.json";
 
 #[tauri::command]
 fn wipe_all(){
@@ -34,11 +33,11 @@ fn load_last_n_entries(n: usize) -> Vec<String>{
 
 #[tauri::command]
 fn init(on_event: Channel<String>){
-    spawn(move || {
-        let mut clipboard = Clipboard::new()::unwrap();
+    std::thread::spawn(move || {
+        let mut clipboard = Clipboard::new().unwrap();
         loop {
             if let Ok(text) = clipboard.get_text() {
-                    let mut history = load_history().unwrap_else(|_| ClipboardHistory{ items: vec![] });
+                    let mut history = load_history().unwrap_or_else(|_| ClipboardHistory{ items: vec![] });
                     if history.items.last().map(|last| last != &text).unwrap_or(true){
                         history.items.push(text.clone());
                         save_history(&history).unwrap();
@@ -46,20 +45,20 @@ fn init(on_event: Channel<String>){
                     }
                 
             }
-            std::thread::sleep(std::time::Duration::from_millis(2000)); // equivalent to 2 seconds
+            std::thread::sleep(std::time::Duration::from_millis(1000)); // equivalent to 2 seconds
         }
-    })
+    });
 }
 
 fn load_history() -> Result<ClipboardHistory, std::io::Error>{
     let file = File::open(PATH)?;
-    let reader = Buffer::new(file);
+    let reader = BufReader::new(file);
     let history = serde_json::from_reader(reader)?;
     Ok(history)
 }
 
 fn save_history(history: &ClipboardHistory) -> Result<(), std::io::Error>{
-    let file = OpenOptions::nre()
+    let file = OpenOptions::new()
         .create(true)
         .write(true)
         .truncate(true)

@@ -72,7 +72,7 @@ fn save_history(history: &ClipboardHistory) -> Result<(), std::io::Error>{
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![wipe_all, copy, load_last_n_entries])
+        .invoke_handler(tauri::generate_handler![wipe_all, copy, load_last_n_entries, init])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
